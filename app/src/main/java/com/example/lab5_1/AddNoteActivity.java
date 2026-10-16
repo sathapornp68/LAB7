@@ -41,8 +41,8 @@ public class AddNoteActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_note);
 
-        // Initialize Controller
-        noteController = NoteController.getInstance();
+        // Initialize Controller with Context
+        noteController = NoteController.getInstance(this);
 
         initViews();
         setupEventListeners();

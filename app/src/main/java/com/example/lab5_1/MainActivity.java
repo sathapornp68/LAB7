@@ -43,8 +43,8 @@ public class MainActivity extends AppCompatActivity implements OnNoteAddedListen
             return insets;
         });
 
-        // Initialize Controller
-        noteController = NoteController.getInstance();
+        // Initialize Controller with Room Database context
+        noteController = NoteController.getInstance(this);
 
         initViews();
         setupRecyclerView();

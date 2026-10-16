@@ -1,42 +1,82 @@
 package com.example.lab5_1;
 
+import android.content.Context;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Repository for managing Notes and publishing Event-driven notifications to listeners.
+ * Repository for managing Notes with Room Database integration and Event-driven notifications.
  */
 public class NoteRepository {
     private static NoteRepository instance;
-    private final List<Note> notes = new ArrayList<>();
+    private NoteDao noteDao;
     private final List<OnNoteAddedListener> listeners = new ArrayList<>();
 
-    private NoteRepository() {
-        // Initial sample data to demonstrate both TextNote and CheckListNote with User information
-        User demoUser = new User("John Doe", "john@example.com");
-        notes.add(new TextNote("Welcome Note", demoUser, "Welcome to Lab 5 Note App! This is an example TextNote created by User John Doe."));
+    private NoteRepository(Context context) {
+        if (context != null) {
+            AppDatabase db = AppDatabase.getInstance(context.getApplicationContext());
+            this.noteDao = db.noteDao();
 
-        List<CheckListItem> demoItems = new ArrayList<>();
-        demoItems.add(new CheckListItem("Design classes (Lab 4)", true));
-        demoItems.add(new CheckListItem("Implement Event-driven UI (Lab 5)", true));
-        demoItems.add(new CheckListItem("Connect User with Note", true));
-        demoItems.add(new CheckListItem("Test on Emulator", false));
-        notes.add(new CheckListNote("Project Tasks", demoUser, demoItems));
+            // Populate initial sample data if database is empty
+            if (noteDao.getAllNotes().isEmpty()) {
+                User demoUser = new User("John Doe", "john@example.com");
+                TextNote welcomeNote = new TextNote("Welcome Note", demoUser, "Welcome to Room Database Note App! This note is persisted in SQLite via Room.");
+                noteDao.insertNote(NoteMapper.toEntity(welcomeNote));
+
+                List<CheckListItem> demoItems = new ArrayList<>();
+                demoItems.add(new CheckListItem("Design Room Entity & DAO", true));
+                demoItems.add(new CheckListItem("Setup AppDatabase & TypeConverters", true));
+                demoItems.add(new CheckListItem("Connect Room with MVC Architecture", true));
+                demoItems.add(new CheckListItem("Test SQLite persistence on Emulator", false));
+                CheckListNote projectTasks = new CheckListNote("Room Project Tasks", demoUser, demoItems);
+                noteDao.insertNote(NoteMapper.toEntity(projectTasks));
+            }
+        }
     }
 
-    public static synchronized NoteRepository getInstance() {
+    public static synchronized NoteRepository getInstance(Context context) {
         if (instance == null) {
-            instance = new NoteRepository();
+            instance = new NoteRepository(context);
         }
         return instance;
     }
 
+    public static synchronized NoteRepository getInstance() {
+        if (instance == null) {
+            instance = new NoteRepository(null);
+        }
+        return instance;
+    }
+
+    public void initDatabase(Context context) {
+        if (noteDao == null && context != null) {
+            AppDatabase db = AppDatabase.getInstance(context.getApplicationContext());
+            this.noteDao = db.noteDao();
+        }
+    }
+
     public List<Note> getNotes() {
-        return new ArrayList<>(notes);
+        if (noteDao != null) {
+            List<NoteEntity> entities = noteDao.getAllNotes();
+            return NoteMapper.toDomainModelList(entities);
+        }
+        return new ArrayList<>();
+    }
+
+    public List<Note> searchNotesByUser(String query) {
+        if (noteDao != null) {
+            List<NoteEntity> entities = noteDao.searchNotesByUser(query);
+            return NoteMapper.toDomainModelList(entities);
+        }
+        return new ArrayList<>();
     }
 
     public void addNote(Note note) {
-        notes.add(note);
+        if (noteDao != null) {
+            NoteEntity entity = NoteMapper.toEntity(note);
+            noteDao.insertNote(entity);
+        }
         notifyNoteAdded(note);
     }
 

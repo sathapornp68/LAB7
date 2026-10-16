@@ -1,18 +1,22 @@
 package com.example.lab5_1;
 
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.util.List;
+
 /**
- * BrowseNoteActivity implementing Multitasking (Thread) for simulated search operations.
+ * BrowseNoteActivity implementing Room Database & Multitasking (Thread) search operations.
  */
 public class BrowseNoteActivity extends AppCompatActivity {
 
@@ -22,10 +26,15 @@ public class BrowseNoteActivity extends AppCompatActivity {
     private TextView tvSearchResultStatus;
     private RecyclerView rvSearchResults;
 
+    private NoteController noteController;
+    private NoteAdapter adapter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_browse_note);
+
+        noteController = NoteController.getInstance(this);
 
         initViews();
         setupListeners();
@@ -37,6 +46,8 @@ public class BrowseNoteActivity extends AppCompatActivity {
         llSearchLoadingContainer = findViewById(R.id.llSearchLoadingContainer);
         tvSearchResultStatus = findViewById(R.id.tvSearchResultStatus);
         rvSearchResults = findViewById(R.id.rvSearchResults);
+
+        rvSearchResults.setLayoutManager(new LinearLayoutManager(this));
     }
 
     private void setupListeners() {
@@ -44,17 +55,19 @@ public class BrowseNoteActivity extends AppCompatActivity {
     }
 
     /**
-     * Requirement 3: Multitasking search using Thread.
-     * Displays ProgressBar, delays 2 seconds, and displays "ไม่พบข้อมูล".
+     * Multitasking search using Thread & Room Database.
+     * Displays ProgressBar, delays 2 seconds, and displays search results or "ไม่พบข้อมูล".
      */
     private void performMultitaskingSearch() {
+        String searchQuery = etSearchUser.getText() != null ? etSearchUser.getText().toString().trim() : "";
+
         // Hide result view and show ProgressBar
         llSearchLoadingContainer.setVisibility(View.VISIBLE);
         tvSearchResultStatus.setVisibility(View.GONE);
         rvSearchResults.setVisibility(View.GONE);
         btnSearchUser.setEnabled(false);
 
-        // Multitasking via Background Thread
+        // Multitasking via Background Thread querying Room Database
         new Thread(() -> {
             try {
                 // Delay 2 seconds as specified in requirement
@@ -63,12 +76,31 @@ public class BrowseNoteActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            final List<Note> results;
+            if (!TextUtils.isEmpty(searchQuery)) {
+                results = noteController.searchNotesByUser(searchQuery);
+            } else {
+                results = null;
+            }
+
             // Update UI on main thread
             runOnUiThread(() -> {
                 llSearchLoadingContainer.setVisibility(View.GONE);
                 btnSearchUser.setEnabled(true);
-                tvSearchResultStatus.setVisibility(View.VISIBLE);
-                tvSearchResultStatus.setText(getString(R.string.msg_not_found));
+
+                if (results != null && !results.isEmpty()) {
+                    if (adapter == null) {
+                        adapter = new NoteAdapter(BrowseNoteActivity.this, results);
+                        rvSearchResults.setAdapter(adapter);
+                    } else {
+                        adapter.updateNotes(results);
+                    }
+                    rvSearchResults.setVisibility(View.VISIBLE);
+                    tvSearchResultStatus.setVisibility(View.GONE);
+                } else {
+                    tvSearchResultStatus.setVisibility(View.VISIBLE);
+                    tvSearchResultStatus.setText(getString(R.string.msg_not_found));
+                }
             });
         }).start();
     }
